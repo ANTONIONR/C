@@ -1,0 +1,79 @@
+/***
+
+FILE NAME      : clock.pc
+DESCRIPTION    : Timer/cron to execute a Oracle stored procedure. In this case the 
+                 pro*c is going to run on the same machine in which the database is
+AUTHOR         : Antonio NAVARRO - /\/\/
+CREATE         : 26.02.2020
+LAST MODIFIED  : 26.02.2020
+USAGE          : ./reloj  intervalo (Sg)
+EXAMPLE        : ./reloj 10
+
+***/
+
+#include "stdio.h"
+#include "stdlib.h"
+#include "string.h"
+#include <sys/types.h> 
+
+EXEC SQL INCLUDE sqlca;
+
+EXEC SQL WHENEVER SQLERROR DO sql_error();
+
+void sql_error() {
+   char msg[200];
+   size_t buf_len, msg_len;
+   buf_len = sizeof (msg);
+   sqlglm(msg, &buf_len, &msg_len);
+   printf("%.*s\n", msg_len, msg);
+
+   exit(1);
+}
+
+int main(int argc, char* argv[])
+{
+
+   pid_t pid;  /* id for the new process */        
+            
+            
+   // For reasons of clarity and simplicity I put the username and password here. 
+   // But for security reasons this should not be done, if someone sees the source 
+   // already has a way to connect and with a simple strings it could also be seen 
+   // in the binary file
+   EXEC SQL BEGIN DECLARE SECTION;
+   char username[] = "user/pass";   
+   char *proceso = NULL;
+
+   EXEC SQL END DECLARE SECTION;
+
+   proceso = argv[1];
+   
+  /*** Create like a daemon ***/
+  pid = fork ();
+  if (pid != 0 ) /*** Codigo del padre ***/
+  {
+     /*** Show the pid of procces create by spawner ***/
+     system ("/usr/bin/date");
+     printf (">>> Arrancando proceso... \n");
+     printf (">>> Empezado con PID %d \n",pid);
+     printf (">>> Prioridad: %d\n", getpriority (0,pid));
+     
+     exit (0);  /* The father ends here */
+  }
+  else /*** I am the son ***/
+  {                   	      
+          EXEC SQL CONNECT :username;     /* Connect to the database */
+          	
+          for (;;)   /* infinite loop, sleep and execute */
+          {            
+             EXEC SQL EXECUTE 
+                BEGIN stored_procedure();
+                END;
+             END-EXEC;
+             sleep (atoi(argv[1]));          
+          }
+  } /* if */
+  
+  exit(1); /*** it should never come here ***/
+}
+
